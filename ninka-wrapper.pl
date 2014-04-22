@@ -9,26 +9,11 @@ use File::Basename;
 
 if(scalar(@ARGV) != 2){
     print STDERR "Incorrect number of arguments\n";
-    print STDERR "Correct usage is: perl ninka-wrapper <tar-file> <database>\n";
+    print STDERR "Correct usage is: perl ninka-wrapper <path to tar file> <database name>\n";
     exit 1;
 }
 
 my ($file, $db) = @ARGV;
-my $dbh = DBI->connect("DBI:SQLite:dbname=$db", "", "", {RaiseError => 1})
-    or die $DBI::errstr;
-
-$dbh->do("CREATE TABLE IF NOT EXISTS
-          comments (filename TEXT, content TEXT)");
-$dbh->do("CREATE TABLE IF NOT EXISTS 
-          sentences (filename TEXT, content TEXT)");
-$dbh->do("CREATE TABLE IF NOT EXISTS 
-          goodsents (filename TEXT, content TEXT)");
-$dbh->do("CREATE TABLE IF NOT EXISTS
-          badsents (filename TEXT, content TEXT)");
-$dbh->do("CREATE TABLE IF NOT EXISTS
-          senttoks (filename TEXT, content TEXT)");
-$dbh->do("CREATE TABLE IF NOT EXISTS
-          licenses (filename TEXT, content TEXT)");
 
 my $tempdir = File::Temp->newdir();
 my $dirname = $tempdir->dirname;
@@ -45,8 +30,24 @@ find(
 print "***** Beginning Execution of Ninka *****\n";
 foreach my $file (@files) {
     print "Running ninka on file [$file]\n";
-    $output = execute("perl ../ninka/ninka.pl '$file'");
+    $output = execute("perl ./ninka.pl '$file'");
 }
+
+my $dbh = DBI->connect("DBI:SQLite:dbname=$db", "", "", {RaiseError => 1})
+    or die $DBI::errstr;
+
+$dbh->do("CREATE TABLE IF NOT EXISTS
+          comments (filename TEXT, content TEXT)");
+$dbh->do("CREATE TABLE IF NOT EXISTS 
+          sentences (filename TEXT, content TEXT)");
+$dbh->do("CREATE TABLE IF NOT EXISTS 
+          goodsents (filename TEXT, content TEXT)");
+$dbh->do("CREATE TABLE IF NOT EXISTS
+          badsents (filename TEXT, content TEXT)");
+$dbh->do("CREATE TABLE IF NOT EXISTS
+          senttoks (filename TEXT, content TEXT)");
+$dbh->do("CREATE TABLE IF NOT EXISTS
+          licenses (filename TEXT, content TEXT)");
 
 my @ninkafiles;
 find(
@@ -59,7 +60,7 @@ find(
     $dirname
 );
 
-print "***** Entering Ninka Data into Database [$db]\n *****";
+print "***** Entering Ninka Data into Database [$db] *****\n";
 foreach my $file (@ninkafiles) {
     
     my $basefile = basename($file);
@@ -72,27 +73,27 @@ foreach my $file (@ninkafiles) {
     my $sth;
     switch (getExtension($basefile)){
 	case ".comments" {
-	    print "Inserting [$basefile\] into table comments\n";
+	    print "Inserting [$basefile] into table comments\n";
 	    $sth = $dbh->prepare("INSERT INTO comments VALUES(?, ?)");
 	}
 	case ".sentences" {
-	    print "Inserting [$basefile\] into table sentences\n";
+	    print "Inserting [$basefile] into table sentences\n";
 	    $sth = $dbh->prepare("INSERT INTO sentences VALUES(?, ?)");
 	}
 	case ".goodsent" {
-	    print "Inserting [$basefile\] into table goodsents\n";
+	    print "Inserting [$basefile] into table goodsents\n";
 	    $sth = $dbh->prepare("INSERT INTO goodsents VALUES(?, ?)");
 	}
 	case ".badsent" {
-	    print "Inserting [$basefile\] into table goodsents\n";
+	    print "Inserting [$basefile] into table goodsents\n";
 	    $sth = $dbh->prepare("INSERT INTO badsents VALUES(?, ?)");
 	}
 	case ".senttok" {
-	    print "Inserting [$basefile\] into table senttoks\n";
+	    print "Inserting [$basefile] into table senttoks\n";
 	    $sth = $dbh->prepare("INSERT INTO senttoks VALUES(?, ?)");
 	}
 	case ".license" {
-	    print "Inserting [$basefile\] into table licenses\n";
+	    print "Inserting [$basefile] into table licenses\n";
 	    $sth = $dbh->prepare("INSERT INTO licenses VALUES(?, ?)");
 	}
     }

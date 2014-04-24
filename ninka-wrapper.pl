@@ -6,6 +6,7 @@ use DBI;
 use File::Temp;
 use File::Find;
 use File::Basename;
+use Scalar::Util qw(looks_like_number);
 
 if(scalar(@ARGV) != 2){
     print STDERR "Incorrect number of arguments\n";
@@ -33,7 +34,9 @@ $dbh->do("CREATE TABLE IF NOT EXISTS
           senttoks (filename TEXT, path TEXT, container TEXT, content TEXT,
           PRIMARY KEY(filename, path, container))");
 $dbh->do("CREATE TABLE IF NOT EXISTS
-          licenses (filename TEXT, path TEXT, container TEXT, content TEXT,
+          licenses (filename TEXT, path TEXT, container TEXT, licenses TEXT,
+          num_found INT, lines INT, toks_ignored INT, toks_unmatched INT,
+          toks_unknown INT, tokens TEXT,
           PRIMARY KEY(filename, path, container))");
 
 my $tempdir = File::Temp->newdir();
@@ -89,38 +92,58 @@ foreach my $file (@ninkafiles) {
     switch (getExtension($basefile)){
 	case ".comments" {
 	    print "Inserting [$basefile] into table comments\n";
-	    $sth = $dbh->prepare("INSERT INTO comments VALUES(?, ?, ?, ?)");
+	    $sth = $dbh->prepare("INSERT INTO comments VALUES
+                                  ('$rootfile', '$filepath', '$packname', ?)");
 	}
 	case ".sentences" {
 	    print "Inserting [$basefile] into table sentences\n";
-	    $sth = $dbh->prepare("INSERT INTO sentences VALUES(?, ?, ?, ?)");
+	    $sth = $dbh->prepare("INSERT INTO sentences VALUES
+                                  ('$rootfile', '$filepath', '$packname', ?)");
 	}
 	case ".goodsent" {
 	    print "Inserting [$basefile] into table goodsents\n";
-	    $sth = $dbh->prepare("INSERT INTO goodsents VALUES(?, ?, ?, ?)");
+	    $sth = $dbh->prepare("INSERT INTO goodsents VALUES
+                                  ('$rootfile', '$filepath', '$packname', ?)");
 	}
 	case ".badsent" {
 	    print "Inserting [$basefile] into table goodsents\n";
-	    $sth = $dbh->prepare("INSERT INTO badsents VALUES(?, ?, ?, ?)");
+	    $sth = $dbh->prepare("INSERT INTO badsents VALUES
+                                  ('$rootfile', '$filepath', '$packname', ?)");
 	}
 	case ".senttok" {
 	    print "Inserting [$basefile] into table senttoks\n";
-	    $sth = $dbh->prepare("INSERT INTO senttoks VALUES(?, ?, ?, ?)");
+	    $sth = $dbh->prepare("INSERT INTO senttoks VALUES
+                                  ('$rootfile', '$filepath', '$packname', ?)");
 	}
 	case ".license" {
 	    print "Inserting [$basefile] into table licenses\n";
-	    $sth = $dbh->prepare("INSERT INTO licenses VALUES(?, ?, ?, ?)");
+	    my @columns = parseLicenseData($filedata);
+	    $sth = $dbh->prepare("INSERT INTO licenses VALUES
+                                  ('$rootfile', '$filepath', '$packname', '$columns[0]', '$columns[1]',
+                                   '$columns[2]', '$columns[3]', '$columns[4]', '$columns[5]', '$columns[6]')");
 	}
     }
-    $sth->bind_param(1, $rootfile);
-    $sth->bind_param(2, $filepath);
-    $sth->bind_param(3, $packname);
-    $sth->bind_param(4, $filedata);
+
+    $sth->bind_param(1, $filedata);
     $sth->execute;
     close($fh);
 }
 
 $dbh->disconnect;
+
+sub parseLicenseData {
+    my ($data) = @_;
+
+    my @columns;
+    my @fields = split(';', $data);
+    if($fields[0] eq "NONE\n"){
+	@columns = '' x 7;
+	@columns[0] = 'NONE';
+    } else {
+	@columns = @fields;
+    }
+    return @columns;
+}
 
 sub getExtension {
     my ($file) = @_;
@@ -141,5 +164,4 @@ sub execute {
     my $status = ($? >> 8);
     die "execution of [$command] failed: status [$status]\n" if ($status != 0);
     return $output;
-
 }
